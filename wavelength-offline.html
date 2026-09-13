@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wavelength — Pass &amp; Play</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1e2127;
+    --panel2: #23262c;
+    --line: #2c3037;
+    --text: #e9e7e2;
+    --muted: #8b8f98;
+    --accent: #c9a24b;
+    --green: #4f9b6e;
+    --red: #b5504f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px 16px 60px;
+  }
+  h1 { font-size: 1.4rem; color: var(--accent); margin: 0 0 4px 0; }
+  h2 { font-size: 1.05rem; color: var(--accent); margin: 16px 0 8px 0; }
+  p.sub { color: var(--muted); font-size: 0.85rem; margin: 10px 0 16px 0; max-width: 80%; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  input[type=text], input[type=number] {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 11px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+  .add-row { display: flex; gap: 8px; }
+  .add-row input { margin-bottom: 0; }
+  .add-row button { width: auto; padding: 11px 16px; }
+  button {
+    background: var(--accent);
+    border: none;
+    color: #000;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 800;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  button.secondary { background: var(--panel2); border: 1px solid var(--line); color: var(--text); font-weight: 600; }
+  button.green { background: var(--green); color: #fff; }
+  button:disabled { opacity: 0.35; }
+  .small { font-size: 0.78rem; color: var(--muted); }
+  .center { text-align: center; }
+
+  .player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.9rem;
+  }
+  .player-row:last-child { border-bottom: none; }
+  .player-row .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0; }
+  .player-row .name-block { display: flex; align-items: center; }
+  .psychic-pick { width: auto; padding: 5px 10px; font-size: 0.72rem; margin: 0; }
+
+  .scoreboard {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    padding: 8px 0 10px 0;
+    z-index: 5;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .score-chip {
+    flex-shrink: 0;
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .score-chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .score-chip .val { font-weight: 800; }
+  .score-chip.psychic { opacity: 0.7; font-style: italic; }
+
+  .phase-banner {
+    text-align: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--panel2);
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .dial-wrap {
+    margin: 0 auto 14px;
+    max-width: 360px;
+    touch-action: none;
+  }
+  .spectrum-labels-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .spectrum-label {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text);
+    max-width: 48%;
+  }
+  .spectrum-label.left { text-align: left; }
+  .spectrum-label.right { text-align: right; }
+  svg#dialSvg { width: 100%; height: auto; display: block; cursor: grab; }
+  svg#dialSvg:active { cursor: grabbing; }
+
+  .spectrum-setup { text-align: center; }
+  .spectrum-setup .vs { font-size: 1.3rem; color: var(--accent); margin: 8px 0; font-weight: 700; }
+
+  .result-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel2);
+    border-left: 4px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .result-card .rname { font-weight: 700; font-size: 0.9rem; }
+  .result-card .rband { font-size: 0.72rem; color: var(--muted); }
+  .result-card .rpts { font-size: 1.2rem; font-weight: 800; color: var(--accent); }
+
+  .turn-banner { text-align: center; padding: 30px 16px; }
+  .turn-banner .who { font-size: 1.4rem; font-weight: 800; color: var(--accent); margin: 10px 0; }
+  .help-fab {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 50;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+
+<a href="wavelength-help.html" target="_blank" rel="noopener" class="help-fab" aria-label="How to play">❓</a>
+
+<h1>📡 Wavelength</h1>
+<p class="sub">One device, passed around the group. One clue-giver, everyone else guesses.</p>
+
+<!-- MODE CHOICE -->
+<div id="screen-mode-choice" class="screen active">
+  <div class="card">
+    <button onclick="chooseGroupMode()">Group Mode</button>
+    <p class="small center">One fixed Psychic. Everyone else competes to reach the target score first.</p>
+  </div>
+  <div class="card">
+    <button class="secondary" onclick="chooseH2HMode()">Head to Head</button>
+    <p class="small center">Exactly 2 players or teams. Psychic and Guesser swap every round.</p>
+  </div>
+</div>
+
+<!-- SETUP (Group) -->
+<div id="screen-setup" class="screen">
+  <div class="card">
+    <h2 style="margin-top:0">Players</h2>
+    <div class="add-row">
+      <input type="text" id="nameInput" placeholder="Player name" maxlength="16">
+      <button onclick="addPlayer()">Add</button>
+    </div>
+    <div id="playerList"></div>
+    <p class="small" id="playerCount">0 players added</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Target score to win</h2>
+    <input type="number" id="targetScoreInput" min="5" value="20">
+  </div>
+  <button onclick="startGame()">Start Game</button>
+  <p class="small center" id="setupError"></p>
+</div>
+
+<!-- SETUP (Head to Head) -->
+<div id="screen-h2h-setup" class="screen">
+  <div class="card">
+    <h2 style="margin-top:0">Side 1</h2>
+    <input type="text" id="h2hName1Input" placeholder="Name or team name" maxlength="20">
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Side 2</h2>
+    <input type="text" id="h2hName2Input" placeholder="Name or team name" maxlength="20">
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Target score to win</h2>
+    <input type="number" id="h2hTargetScoreInput" min="5" value="20">
+  </div>
+  <p class="small">Side 1 is Psychic for round 1. You'll swap every round after that.</p>
+  <button onclick="startH2HGame()">Start Game</button>
+  <p class="small center" id="h2hSetupError"></p>
+</div>
+
+<!-- GAME -->
+<div id="screen-game" class="screen">
+  <div class="scoreboard" id="scoreboard"></div>
+  <div class="phase-banner" id="phaseBanner"></div>
+
+  <!-- Spectrum selection (Psychic sets this up while holding the phone) -->
+  <div class="card spectrum-setup" id="panel-spectrum-select" style="display:none">
+    <h2 style="margin-top:0">Psychic: choose this round's spectrum</h2>
+    <button onclick="pickRandomSpectrum()">🎲 Random Spectrum</button>
+    <input type="text" id="customLeftInput" placeholder="Left side (e.g. Cold)">
+    <input type="text" id="customRightInput" placeholder="Right side (e.g. Hot)">
+    <button class="secondary" onclick="pickCustomSpectrum()">Use My Own</button>
+    <div id="spectrumPreview" style="display:none; margin-top:10px;">
+      <p class="small">This round:</p>
+      <p style="font-weight:700; color:var(--accent);"><span id="previewLeft"></span> <span class="vs">↔</span> <span id="previewRight"></span></p>
+      <button class="green" onclick="confirmSpectrum()">Confirm &amp; Continue</button>
+    </div>
+  </div>
+
+  <!-- Dial (shared across phases) -->
+  <div class="card" id="panel-dial" style="display:none">
+    <div class="dial-wrap">
+      <svg id="dialSvg" viewBox="0 0 300 175" xmlns="http://www.w3.org/2000/svg">
+        <path id="baseArc" d="" stroke="#2c3037" stroke-width="16" fill="none" stroke-linecap="round"/>
+        <g id="scoreZones"></g>
+        <g id="guesserDots"></g>
+        <line id="needleLine" x1="150" y1="160" x2="150" y2="40" stroke="#c9a24b" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="150" cy="160" r="10" fill="#e9e7e2"/>
+      </svg>
+      <div class="spectrum-labels-row">
+        <div class="spectrum-label left" id="dialLeftLabel">-</div>
+        <div class="spectrum-label right" id="dialRightLabel">-</div>
+      </div>
+    </div>
+    <div id="dialActionBox"></div>
+  </div>
+
+  <!-- Turn banner: whoever should tap next -->
+  <div class="card turn-banner" id="panel-turn-banner" style="display:none">
+    <p class="small">It's your turn</p>
+    <div class="who" id="turnBannerName">-</div>
+    <button id="turnBannerBtn">Tap When Ready</button>
+  </div>
+
+  <!-- Round result -->
+  <div class="card" id="panel-result" style="display:none">
+    <h2 style="margin-top:0">Round Result</h2>
+    <div id="resultCards"></div>
+    <button onclick="nextRound()">Next Round</button>
+  </div>
+</div>
+
+<!-- ENDED -->
+<div id="screen-ended" class="screen">
+  <div class="card center">
+    <h2 style="margin-top:0">🏆 Game Over</h2>
+    <p class="small" id="endedWinnerText"></p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Final Scores</h2>
+    <div id="endedScoresList"></div>
+  </div>
+  <button class="secondary" onclick="location.reload()">Back to Start</button>
+</div>
+
+<script>
+const PLAYER_COLORS = ["#c9a24b", "#6b8fa3", "#b5504f", "#4f9b6e", "#8a5fc9", "#d47a9c", "#4f7fb5", "#c98a4b"];
+
+const SPECTRUMS = [
+  ["Cold", "Hot"], ["Underrated", "Overrated"], ["Actually Terrible", "Guilty Pleasure"],
+  ["Cheap", "Expensive"], ["Boring", "Thrilling"], ["Simple", "Complicated"],
+  ["Ancient", "Futuristic"], ["Quiet", "Loud"], ["Safe Choice", "Risky Choice"],
+  ["Formal", "Casual"], ["Common", "Rare"], ["Small Talk", "Deep Conversation"],
+  ["Relaxing", "Stressful"], ["Healthy", "Unhealthy"], ["Predictable", "Surprising"],
+  ["Indoor Activity", "Outdoor Activity"], ["Low Effort", "High Effort"], ["Niche", "Mainstream"],
+  ["Old-Fashioned", "Trendy"], ["Practical", "Impractical"]
+];
+
+function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// ---------- DIAL MATH ----------
+const DIAL_CX = 150, DIAL_CY = 160, DIAL_R = 122;
+
+function angleToPoint(theta, r) {
+  r = r || DIAL_R;
+  const a = (180 - theta) * Math.PI / 180;
+  return { x: DIAL_CX + r * Math.cos(a), y: DIAL_CY - r * Math.sin(a) };
+}
+function pointToAngle(px, py) {
+  const dx = px - DIAL_CX, dy = DIAL_CY - py;
+  if (dy < 0) return dx < 0 ? 0 : 180;
+  const raw = Math.atan2(dy, dx) * 180 / Math.PI;
+  return Math.max(0, Math.min(180, 180 - raw));
+}
+function describeArc(startTheta, endTheta, r) {
+  r = r || DIAL_R;
+  const p1 = angleToPoint(startTheta, r), p2 = angleToPoint(endTheta, r);
+  const largeArc = Math.abs(endTheta - startTheta) > 180 ? 1 : 0;
+  return `M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y}`;
+}
+function scoreForGuess(target, guess) {
+  const d = Math.abs(target - guess);
+  if (d <= 3) return 4;
+  if (d <= 12) return 3;
+  if (d <= 25) return 2;
+  return 1;
+}
+function bandLabel(pts) {
+  return pts === 4 ? "Bullseye" : pts === 3 ? "Close" : pts === 2 ? "Nearby" : "Far off";
+}
+
+function setNeedleAngle(theta) {
+  const p = angleToPoint(theta, DIAL_R - 15);
+  document.getElementById("needleLine").setAttribute("x2", p.x);
+  document.getElementById("needleLine").setAttribute("y2", p.y);
+}
+function setNeedleVisible(visible) {
+  document.getElementById("needleLine").style.display = visible ? "" : "none";
+}
+function drawBaseArc() {
+  document.getElementById("baseArc").setAttribute("d", describeArc(0, 180));
+}
+function drawScoreZones(targetTheta) {
+  const g = document.getElementById("scoreZones");
+  g.innerHTML = "";
+  const zones = [
+    { span: 25, color: "#4f7fb5" }, // 2 pts — steel blue
+    { span: 12, color: "#8a5fc9" }, // 3 pts — purple
+    { span: 3,  color: "#f0c14b" }  // 4 pts — bright gold bullseye, deliberately tight
+  ];
+  zones.forEach(z => {
+    const start = Math.max(0, targetTheta - z.span);
+    const end = Math.min(180, targetTheta + z.span);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", describeArc(start, end));
+    path.setAttribute("stroke", z.color);
+    path.setAttribute("stroke-width", "16");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke-linecap", "round");
+    g.appendChild(path);
+  });
+}
+function drawGuesserNeedles(guessesByPid, playersMap) {
+  const g = document.getElementById("guesserDots");
+  g.innerHTML = "";
+  Object.entries(guessesByPid).forEach(([pid, angle]) => {
+    if (typeof angle !== "number") return;
+    const player = playersMap[pid];
+    const color = player ? player.color : "#fff";
+    const p = angleToPoint(angle, DIAL_R - 15);
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", DIAL_CX);
+    line.setAttribute("y1", DIAL_CY);
+    line.setAttribute("x2", p.x);
+    line.setAttribute("y2", p.y);
+    line.setAttribute("stroke", color);
+    line.setAttribute("stroke-width", "3");
+    line.setAttribute("stroke-dasharray", "6,5");
+    line.setAttribute("stroke-linecap", "round");
+    g.appendChild(line);
+  });
+}
+
+let dragCurrentAngle = 90;
+function enableDialDrag(onChange) {
+  const svg = document.getElementById("dialSvg");
+  let dragging = false;
+
+  function svgPoint(evt) {
+    const rect = svg.getBoundingClientRect();
+    const scaleX = 300 / rect.width, scaleY = 175 / rect.height;
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  }
+  function handleMove(evt) {
+    if (!dragging) return;
+    evt.preventDefault();
+    const pt = svgPoint(evt);
+    dragCurrentAngle = pointToAngle(pt.x, pt.y);
+    setNeedleAngle(dragCurrentAngle);
+    if (onChange) onChange(dragCurrentAngle);
+  }
+  function handleStart(evt) { dragging = true; handleMove(evt); }
+  function handleEnd() { dragging = false; }
+
+  svg.onmousedown = handleStart;
+  svg.onmousemove = handleMove;
+  window.addEventListener("mouseup", handleEnd);
+  svg.ontouchstart = handleStart;
+  svg.ontouchmove = handleMove;
+  svg.ontouchend = handleEnd;
+}
+function disableDialDrag() {
+  const svg = document.getElementById("dialSvg");
+  svg.onmousedown = null;
+  svg.onmousemove = null;
+  svg.ontouchstart = null;
+  svg.ontouchmove = null;
+  svg.ontouchend = null;
+}
+drawBaseArc();
+
+// ==================================================================
+// GAME STATE
+// ==================================================================
+let gameMode = "group"; // "group" | "h2h"
+let players = []; // {id, name, color, isPsychic, score}
+let nextId = 1;
+let state = null; // { round, phase, spectrum, targetAngle, guesses: {id: angle}, guessOrder, targetScore, winner }
+
+function chooseGroupMode() {
+  gameMode = "group";
+  showScreen("screen-setup");
+}
+function chooseH2HMode() {
+  gameMode = "h2h";
+  showScreen("screen-h2h-setup");
+}
+
+function addPlayer() {
+  const input = document.getElementById("nameInput");
+  const name = input.value.trim();
+  if (!name) return;
+  const color = PLAYER_COLORS[players.length % PLAYER_COLORS.length];
+  players.push({ id: nextId++, name, color, isPsychic: false, score: 0 });
+  input.value = "";
+  renderPlayerList();
+}
+function removePlayer(id) {
+  players = players.filter(p => p.id !== id);
+  renderPlayerList();
+}
+function setPsychic(id) {
+  players.forEach(p => { p.isPsychic = (p.id === id) ? !p.isPsychic : false; });
+  renderPlayerList();
+}
+function renderPlayerList() {
+  document.getElementById("playerList").innerHTML = players.map(p => `
+    <div class="player-row">
+      <span class="name-block"><span class="dot" style="background:${p.color}"></span>${escapeHtml(p.name)}${p.isPsychic ? " (Psychic)" : ""}</span>
+      <span>
+        <button class="secondary psychic-pick" onclick="setPsychic(${p.id})">${p.isPsychic ? "Unset" : "Psychic"}</button>
+        <button class="secondary psychic-pick" onclick="removePlayer(${p.id})">✕</button>
+      </span>
+    </div>
+  `).join("") || `<p class="small">No players yet.</p>`;
+  document.getElementById("playerCount").textContent = `${players.length} player${players.length === 1 ? "" : "s"} added`;
+}
+
+function startGame() {
+  const total = players.length;
+  const psychic = players.find(p => p.isPsychic);
+  const targetScore = parseInt(document.getElementById("targetScoreInput").value, 10);
+  const errorEl = document.getElementById("setupError");
+  if (total < 2) return errorEl.textContent = "Add at least 2 players.";
+  if (!psychic) return errorEl.textContent = "Assign a Psychic.";
+  if (!targetScore || targetScore < 1) return errorEl.textContent = "Enter a valid target score.";
+  errorEl.textContent = "";
+
+  players.forEach(p => p.score = 0);
+  state = { round: 1, phase: "spectrum-select", spectrum: null, targetAngle: null, guesses: {}, guessOrder: [], targetScore, winner: null };
+  render();
+}
+
+function startH2HGame() {
+  const name1 = document.getElementById("h2hName1Input").value.trim();
+  const name2 = document.getElementById("h2hName2Input").value.trim();
+  const targetScore = parseInt(document.getElementById("h2hTargetScoreInput").value, 10);
+  const errorEl = document.getElementById("h2hSetupError");
+  if (!name1 || !name2) return errorEl.textContent = "Enter both side names.";
+  if (!targetScore || targetScore < 1) return errorEl.textContent = "Enter a valid target score.";
+  errorEl.textContent = "";
+
+  players = [
+    { id: 1, name: name1, color: PLAYER_COLORS[0], isPsychic: true, score: 0 },
+    { id: 2, name: name2, color: PLAYER_COLORS[1], isPsychic: false, score: 0 }
+  ];
+  nextId = 3;
+  state = { round: 1, phase: "spectrum-select", spectrum: null, targetAngle: null, guesses: {}, guessOrder: [], targetScore, winner: null };
+  render();
+}
+
+function submitSpectrum(left, right) {
+  state.spectrum = { left, right };
+  state.phase = "psychic-reveal";
+  render();
+}
+function revealTarget() {
+  state.targetAngle = Math.random() * 180;
+  render("psychic-viewing");
+}
+function beginGuessing() {
+  state.phase = "guessing";
+  state.guesses = {};
+  state.guessOrder = players.filter(p => !p.isPsychic).map(p => p.id);
+  render();
+}
+function beginTurn() {
+  render("guessing-active");
+}
+function submitGuess(angle) {
+  const currentId = state.guessOrder[0];
+  state.guesses[currentId] = angle;
+  state.guessOrder.shift();
+  if (state.guessOrder.length === 0) {
+    applyScores();
+    state.phase = "round-result";
+  }
+  render();
+}
+function applyScores() {
+  Object.entries(state.guesses).forEach(([pid, angle]) => {
+    const player = players.find(p => p.id == pid);
+    if (player) {
+      player.score += scoreForGuess(state.targetAngle, angle);
+      if (player.score >= state.targetScore) state.winner = player;
+    }
+  });
+}
+function nextRound() {
+  if (state.winner) { renderEnded(); return; }
+  state.round += 1;
+  if (gameMode === "h2h") {
+    players.forEach(p => { p.isPsychic = !p.isPsychic; });
+  }
+  state.phase = "spectrum-select";
+  state.spectrum = null;
+  state.targetAngle = null;
+  state.guesses = {};
+  render();
+}
+
+// ==================================================================
+// RENDERING
+// viewerMode: undefined (neutral holder) | "psychic-viewing" | "guessing-active"
+// ==================================================================
+function render(viewerMode) {
+  showScreen("screen-game");
+
+  document.getElementById("scoreboard").innerHTML = players.map(p => `
+    <div class="score-chip ${(gameMode === "group" && p.isPsychic) ? "psychic" : ""}">
+      <span class="dot" style="background:${p.color}"></span>
+      <span>${escapeHtml(p.name)}</span>
+      ${(gameMode === "group" && p.isPsychic) ? "" : `<span class="val">${p.score}</span>`}
+    </div>
+  `).join("");
+
+  document.getElementById("phaseBanner").textContent = ({
+    "spectrum-select": "Choosing this round's spectrum...",
+    "psychic-reveal": "The Psychic is finding their target...",
+    "guessing": "Guessing in progress...",
+    "round-result": "Round result!"
+  })[state.phase] || "";
+
+  hideAllGamePanels();
+
+  if (state.phase === "spectrum-select") {
+    document.getElementById("panel-spectrum-select").style.display = "block";
+    return;
+  }
+
+  if (state.phase === "psychic-reveal") {
+    document.getElementById("dialLeftLabel").textContent = state.spectrum.left;
+    document.getElementById("dialRightLabel").textContent = state.spectrum.right;
+    if (viewerMode === "psychic-viewing") {
+      document.getElementById("panel-dial").style.display = "block";
+      disableDialDrag();
+      setNeedleVisible(true);
+      setNeedleAngle(state.targetAngle);
+      drawScoreZones(state.targetAngle);
+      document.getElementById("guesserDots").innerHTML = ""; // clear last round's guess line(s) — irrelevant now
+      document.getElementById("dialActionBox").innerHTML = `<button class="green" onclick="beginGuessing()">Hide &amp; Continue</button>`;
+    } else {
+      const psychicName = (players.find(p => p.isPsychic) || {}).name || "the Psychic";
+      showTurnBanner(psychicName, "Reveal My Target", revealTarget);
+    }
+    return;
+  }
+
+  if (state.phase === "guessing") {
+    document.getElementById("dialLeftLabel").textContent = state.spectrum.left;
+    document.getElementById("dialRightLabel").textContent = state.spectrum.right;
+    if (viewerMode === "guessing-active") {
+      document.getElementById("panel-dial").style.display = "block";
+      document.getElementById("scoreZones").innerHTML = "";
+      document.getElementById("guesserDots").innerHTML = "";
+      setNeedleVisible(true);
+      setNeedleAngle(90);
+      enableDialDrag(a => { dragCurrentAngle = a; });
+      document.getElementById("dialActionBox").innerHTML = `<button class="green" onclick="submitGuess(dragCurrentAngle)">Lock In Guess</button>`;
+    } else if (state.guessOrder.length > 0) {
+      const nextPlayer = players.find(p => p.id === state.guessOrder[0]);
+      showTurnBanner(nextPlayer.name, "Tap When Ready to Guess", beginTurn);
+    }
+    return;
+  }
+
+  if (state.phase === "round-result") {
+    renderRoundResult();
+    return;
+  }
+}
+
+function hideAllGamePanels() {
+  ["panel-spectrum-select", "panel-dial", "panel-turn-banner", "panel-result"].forEach(id => {
+    document.getElementById(id).style.display = "none";
+  });
+  disableDialDrag();
+}
+
+function showTurnBanner(name, btnLabel, onTap) {
+  document.getElementById("panel-turn-banner").style.display = "block";
+  document.getElementById("turnBannerName").textContent = name;
+  const btn = document.getElementById("turnBannerBtn");
+  btn.textContent = btnLabel;
+  btn.onclick = onTap;
+}
+
+function renderRoundResult() {
+  document.getElementById("panel-result").style.display = "block";
+  document.getElementById("panel-dial").style.display = "block";
+  disableDialDrag();
+  document.getElementById("dialActionBox").innerHTML = ""; // clear the stale Lock In Guess button from the guessing phase
+  document.getElementById("dialLeftLabel").textContent = state.spectrum.left;
+  document.getElementById("dialRightLabel").textContent = state.spectrum.right;
+
+  const playersMap = {};
+  players.forEach(p => playersMap[p.id] = p);
+
+  setNeedleVisible(false); // the zones already show exactly where the target is — a needle pointing at the same spot is redundant here
+  drawScoreZones(state.targetAngle);
+  drawGuesserNeedles(state.guesses, playersMap);
+
+  const cards = Object.entries(state.guesses).map(([pid, angle]) => {
+    const player = playersMap[pid];
+    if (!player) return "";
+    const pts = scoreForGuess(state.targetAngle, angle);
+    return `<div class="result-card" style="border-left-color:${player.color}">
+      <span class="rname">${escapeHtml(player.name)}<br><span class="rband">${bandLabel(pts)} · total ${player.score}</span></span>
+      <span class="rpts">+${pts}</span>
+    </div>`;
+  }).join("");
+  document.getElementById("resultCards").innerHTML = cards;
+}
+
+function renderEnded() {
+  showScreen("screen-ended");
+  const sorted = (gameMode === "h2h" ? players.slice() : players.filter(p => !p.isPsychic)).sort((a, b) => b.score - a.score);
+  document.getElementById("endedWinnerText").textContent = sorted.length ? `${sorted[0].name} wins!` : "";
+  document.getElementById("endedScoresList").innerHTML = sorted.map(p => `
+    <div class="player-row"><span class="name-block"><span class="dot" style="background:${p.color}"></span>${escapeHtml(p.name)}</span><strong>${p.score}</strong></div>
+  `).join("");
+}
+
+// ---------- Spectrum picking ----------
+let pendingSpectrum = null;
+function pickRandomSpectrum() {
+  const pair = SPECTRUMS[Math.floor(Math.random() * SPECTRUMS.length)];
+  showSpectrumPreview(pair[0], pair[1]);
+}
+function pickCustomSpectrum() {
+  const left = document.getElementById("customLeftInput").value.trim();
+  const right = document.getElementById("customRightInput").value.trim();
+  if (!left || !right) return alert("Fill in both sides of the spectrum.");
+  showSpectrumPreview(left, right);
+}
+function showSpectrumPreview(left, right) {
+  pendingSpectrum = { left, right };
+  document.getElementById("previewLeft").textContent = left;
+  document.getElementById("previewRight").textContent = right;
+  document.getElementById("spectrumPreview").style.display = "block";
+}
+function confirmSpectrum() {
+  if (!pendingSpectrum) return;
+  submitSpectrum(pendingSpectrum.left, pendingSpectrum.right);
+  document.getElementById("spectrumPreview").style.display = "none";
+  pendingSpectrum = null;
+}
+</script>
+</body>
+</html>
